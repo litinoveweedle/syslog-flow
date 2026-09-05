@@ -14,10 +14,14 @@ RUN apt-get update \
 COPY --from=build /out/syslog-flow /usr/local/bin/syslog-flow
 COPY rsyslog.conf /etc/rsyslog.conf
 COPY entrypoint.sh /entrypoint.sh
-COPY resources /resources
+COPY resources/favicon.ico resources/apple-touch-icon.png /resources/
+
+ENV SYSLOG_FLOW_LOG_DIR=/logs \
+    SYSLOG_FLOW_CONFIG_DIR=/config \
+    SYSLOG_FLOW_RESOURCES_DIR=/resources
 
 RUN chmod 755 /entrypoint.sh \
-    && mkdir -p /logs
+    && mkdir -p /logs /config
 
 EXPOSE 2200 514/tcp 514/udp
 

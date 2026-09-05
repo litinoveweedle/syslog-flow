@@ -1,0 +1,58 @@
+name: syslog-flow
+arch: "${NFPM_ARCH}"
+platform: linux
+version: "${NFPM_VERSION}"
+maintainer: "syslog-flow contributors <noreply@users.noreply.github.com>"
+description: |
+  Lightweight syslog viewer with a live web UI, backed by rsyslog and
+  plain-text log files. Ships the syslog-flow binary, its systemd unit,
+  and static web assets.
+homepage: "https://github.com/inventor7777/syslog-flow"
+license: MIT
+section: net
+priority: optional
+
+contents:
+  - src: ./dist/syslog-flow
+    dst: /usr/bin/syslog-flow
+    file_info:
+      mode: 0755
+
+  - src: ./resources/favicon.ico
+    dst: /usr/share/syslog-flow/favicon.ico
+    file_info:
+      mode: 0644
+
+  - src: ./resources/apple-touch-icon.png
+    dst: /usr/share/syslog-flow/apple-touch-icon.png
+    file_info:
+      mode: 0644
+
+  - src: ./packaging/syslog-flow.service
+    dst: /lib/systemd/system/syslog-flow.service
+    file_info:
+      mode: 0644
+
+  - src: ./packaging/rsyslog.conf
+    dst: /usr/share/doc/syslog-flow/examples/60-syslog-flow.conf
+    file_info:
+      mode: 0644
+
+  - src: ./README.md
+    dst: /usr/share/doc/syslog-flow/README.md
+    file_info:
+      mode: 0644
+
+  - src: ./LICENSE
+    dst: /usr/share/doc/syslog-flow/LICENSE
+    file_info:
+      mode: 0644
+
+scripts:
+  postinstall: ./packaging/postinstall.sh
+  preremove: ./packaging/preremove.sh
+  postremove: ./packaging/postremove.sh
+
+deb:
+  fields:
+    Vcs-Browser: "https://github.com/inventor7777/syslog-flow"

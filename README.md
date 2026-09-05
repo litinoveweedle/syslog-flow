@@ -92,6 +92,59 @@ Default ports:
 - `514/udp`: syslog ingest
 - `514/tcp`: syslog ingest
 
+## Bare-metal / systemd Install
+
+If you'd rather not use Docker, `syslog-flow` can run directly on a host with `rsyslog` and be supervised by `systemd`. Debian/Ubuntu users can use the prebuilt `.deb` package (see below); everyone else can use a prebuilt static binary from the [Releases](https://github.com/inventor7777/syslog-flow/releases) page (or one you build yourself with `go build ./cmd/syslog-flow`).
+
+By default, `syslog-flow` follows standard Unix service conventions:
+
+- Logs: `/var/log/syslog-flow` (override with `-log-dir` or `SYSLOG_FLOW_LOG_DIR`)
+- Config (`app.json`, `*-colors.json`): `/etc/syslog-flow` (override with `-config-dir` or `SYSLOG_FLOW_CONFIG_DIR`)
+- Static assets (`favicon.ico`, `apple-touch-icon.png`): `/usr/local/share/syslog-flow` (override with `-resources-dir` or `SYSLOG_FLOW_RESOURCES_DIR`)
+
+The log and config directories are created automatically on startup if missing; the resources directory must exist and contain the asset files.
+
+### Option A: Debian/Ubuntu package
+
+Each release publishes a `syslog-flow_<version>_<amd64|arm64|armhf>.deb`. It installs the binary to `/usr/bin/syslog-flow`, static assets to `/usr/share/syslog-flow`, the systemd unit to `/lib/systemd/system/syslog-flow.service`, a `syslog-flow` system user, and creates `/var/log/syslog-flow` and `/etc/syslog-flow`:
+
+```bash
+curl -LO https://github.com/inventor7777/syslog-flow/releases/download/<TAG>/syslog-flow_<TAG>_amd64.deb
+sudo apt install ./syslog-flow_<TAG>_amd64.deb
+```
+
+Then wire up rsyslog and enable the service as in steps 2-3 below (the example rsyslog config ships at `/usr/share/doc/syslog-flow/examples/60-syslog-flow.conf`, and the unit is already installed, just not enabled by default).
+
+### Option B: Manual binary install
+
+1. Install the binary, static assets, and required directories:
+
+   ```bash
+   sudo install -m 755 syslog-flow /usr/local/bin/syslog-flow
+   sudo mkdir -p /var/log/syslog-flow /etc/syslog-flow /usr/local/share/syslog-flow
+   sudo install -m 644 resources/favicon.ico resources/apple-touch-icon.png /usr/local/share/syslog-flow/
+   sudo useradd --system --no-create-home --shell /usr/sbin/nologin syslog-flow
+   sudo chown -R syslog-flow:syslog-flow /var/log/syslog-flow /etc/syslog-flow
+   ```
+
+2. Point your host's `rsyslog` at `syslog-flow`'s log layout by copying `rsyslog.conf`'s templates/action into a drop-in file, e.g. `/etc/rsyslog.d/60-syslog-flow.conf`. If you changed the log directory above, update the `dynaFile` template's path (default `/logs/...`) to match. Then restart rsyslog:
+
+   ```bash
+   sudo cp rsyslog.conf /etc/rsyslog.d/60-syslog-flow.conf
+   sudo sed -i 's#/logs/#/var/log/syslog-flow/#' /etc/rsyslog.d/60-syslog-flow.conf
+   sudo systemctl restart rsyslog
+   ```
+
+3. Install and enable the `syslog-flow` systemd unit (adjust `TZ`, `SYSLOG_FLOW_LOG_DIR`, and `SYSLOG_FLOW_CONFIG_DIR` as needed):
+
+   ```bash
+   sudo cp resources/systemd/syslog-flow.service /etc/systemd/system/syslog-flow.service
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now syslog-flow.service
+   ```
+
+The unit runs as an unprivileged `syslog-flow` user, restarts on failure, and only allows writes to `/logs` and `/config` (matching how `entrypoint.sh` runs the same binary inside the container). Check status/logs with `systemctl status syslog-flow` and `journalctl -u syslog-flow -f`.
+
 ## Update
 
 Back up your configuration first in case there is a breaking change.

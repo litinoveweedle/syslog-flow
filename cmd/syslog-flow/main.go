@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"container/heap"
 	"encoding/json"
+	"flag"
 	"html/template"
 	"log"
 	"net/http"
@@ -18,19 +19,55 @@ import (
 )
 
 const (
-	logRoot            = "/logs"
-	addr               = ":2200"
-	deviceColorPath    = "/config/device-colors.json"
-	statusColorPath    = "/config/status-colors.json"
-	interfaceColorPath = "/config/interface-colors.json"
-	appConfigPath      = "/config/app.json"
-	faviconPath        = "/resources/favicon.ico"
-	appleIconPath      = "/resources/apple-touch-icon.png"
-	dayChunkSize       = 500
-	maxSearchResults   = 5000
+	defaultLogDir       = "/var/log/syslog-flow"
+	defaultConfigDir    = "/etc/syslog-flow"
+	defaultResourcesDir = "/usr/local/share/syslog-flow"
+	addr                = ":2200"
+	dayChunkSize        = 500
+	maxSearchResults    = 5000
+)
+
+// Resolved from flags/env in resolveDirs; read-only after main() starts.
+var (
+	logRoot            string
+	configDir          string
+	resourcesDir       string
+	deviceColorPath    string
+	statusColorPath    string
+	interfaceColorPath string
+	appConfigPath      string
+	faviconPath        string
+	appleIconPath      string
 )
 
 var appLocation = loadAppLocation()
+
+// resolveDirs parses the log/config/resources directory flags (and their env
+// var fallbacks) and derives the individual file paths from them.
+func resolveDirs() {
+	fs := flag.NewFlagSet("syslog-flow", flag.ExitOnError)
+	logDir := fs.String("log-dir", envOrDefault("SYSLOG_FLOW_LOG_DIR", defaultLogDir), "directory to store and read ingested logs from")
+	confDir := fs.String("config-dir", envOrDefault("SYSLOG_FLOW_CONFIG_DIR", defaultConfigDir), "directory to read/write app.json and color configuration files")
+	resDir := fs.String("resources-dir", envOrDefault("SYSLOG_FLOW_RESOURCES_DIR", defaultResourcesDir), "directory containing static assets (favicon.ico, apple-touch-icon.png)")
+	_ = fs.Parse(os.Args[1:])
+
+	logRoot = *logDir
+	configDir = *confDir
+	resourcesDir = *resDir
+	appConfigPath = filepath.Join(configDir, "app.json")
+	deviceColorPath = filepath.Join(configDir, "device-colors.json")
+	statusColorPath = filepath.Join(configDir, "status-colors.json")
+	interfaceColorPath = filepath.Join(configDir, "interface-colors.json")
+	faviconPath = filepath.Join(resourcesDir, "favicon.ico")
+	appleIconPath = filepath.Join(resourcesDir, "apple-touch-icon.png")
+}
+
+func envOrDefault(key, fallback string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	return fallback
+}
 
 func topBarStyles() template.CSS {
 	return template.CSS(`
@@ -326,6 +363,8 @@ var appConfigCache struct {
 }
 
 func main() {
+	resolveDirs()
+	initSettingsSections()
 	if err := ensureConfigFiles(); err != nil {
 		log.Fatal(err)
 	}

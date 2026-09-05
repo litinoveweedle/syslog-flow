@@ -84,9 +84,84 @@ jobs:
             dist/*
           retention-days: 7
 
+  package-deb:
+    name: Package .deb (${{ matrix.arch }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            artifact: binaries-linux-amd64
+          - arch: arm64
+            artifact: binaries-linux-arm64
+          - arch: armhf
+            artifact: binaries-linux-armv7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${{ github.event.release.tag_name }}"
+          fi
+          echo "version=${tag}" >> "$GITHUB_OUTPUT"
+          echo "debversion=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist
+
+      - name: Stage binary for packaging
+        run: |
+          set -euo pipefail
+          bin=$(find dist -maxdepth 1 -type f -name 'syslog-flow-*' ! -name '*.sha256' | head -n1)
+          mv "$bin" dist/syslog-flow
+          chmod 755 dist/syslog-flow
+
+      - name: Build .deb
+        env:
+          NFPM_VERSION: ${{ steps.version.outputs.debversion }}
+          NFPM_ARCH: ${{ matrix.arch }}
+        run: |
+          nfpm package \
+            --config packaging/nfpm.yaml \
+            --packager deb \
+            --target "dist/syslog-flow_${{ steps.version.outputs.version }}_${{ matrix.arch }}.deb"
+
+      - name: Generate checksum
+        run: |
+          cd dist
+          sha256sum "syslog-flow_${{ steps.version.outputs.version }}_${{ matrix.arch }}.deb" \
+            > "syslog-flow_${{ steps.version.outputs.version }}_${{ matrix.arch }}.deb.sha256"
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.arch }}
+          path: |
+            dist/*.deb
+            dist/*.deb.sha256
+          retention-days: 7
+
   release:
     name: Publish release assets
-    needs: build
+    needs: [build, package-deb]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
