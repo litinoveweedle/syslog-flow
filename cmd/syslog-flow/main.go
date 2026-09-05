@@ -22,13 +22,15 @@ const (
 	defaultLogDir       = "/var/log/syslog-flow"
 	defaultConfigDir    = "/etc/syslog-flow"
 	defaultResourcesDir = "/usr/local/share/syslog-flow"
-	addr                = ":2200"
+	defaultPort         = "2200"
+	defaultAddr         = ""
 	dayChunkSize        = 500
 	maxSearchResults    = 5000
 )
 
-// Resolved from flags/env in resolveDirs; read-only after main() starts.
+// Resolved from flags/env in resolveCfg; read-only after main() starts.
 var (
+	listener           string
 	logRoot            string
 	configDir          string
 	resourcesDir       string
@@ -42,15 +44,19 @@ var (
 
 var appLocation = loadAppLocation()
 
-// resolveDirs parses the log/config/resources directory flags (and their env
+// resolveCfg parses the log/config/resources directory flags (and their env
 // var fallbacks) and derives the individual file paths from them.
-func resolveDirs() {
+func resolveCfg() {
 	fs := flag.NewFlagSet("syslog-flow", flag.ExitOnError)
 	logDir := fs.String("log-dir", envOrDefault("SYSLOG_FLOW_LOG_DIR", defaultLogDir), "directory to store and read ingested logs from")
 	confDir := fs.String("config-dir", envOrDefault("SYSLOG_FLOW_CONFIG_DIR", defaultConfigDir), "directory to read/write app.json and color configuration files")
 	resDir := fs.String("resources-dir", envOrDefault("SYSLOG_FLOW_RESOURCES_DIR", defaultResourcesDir), "directory containing static assets (favicon.ico, apple-touch-icon.png)")
 	_ = fs.Parse(os.Args[1:])
 
+	addr := fs.String("addr", envOrDefault("SYSLOG_FLOW_ADDR", defaultAddr), "address to bind the web server to")
+	port := fs.String("port", envOrDefault("SYSLOG_FLOW_PORT", defaultPort), "port to bind the web server to")
+
+	listener = *addr + ":" + *port
 	logRoot = *logDir
 	configDir = *confDir
 	resourcesDir = *resDir
@@ -363,7 +369,7 @@ var appConfigCache struct {
 }
 
 func main() {
-	resolveDirs()
+	resolveCfg()
 	initSettingsSections()
 	if err := ensureConfigFiles(); err != nil {
 		log.Fatal(err)
@@ -389,7 +395,7 @@ func main() {
 
 	log.Printf("syslog-flow listening on %s", addr)
 	server := &http.Server{
-		Addr:              addr,
+		Addr:              listener,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
