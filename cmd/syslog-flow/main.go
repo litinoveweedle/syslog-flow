@@ -393,7 +393,7 @@ func main() {
 	mux.HandleFunc("/favicon.ico", serveFavicon)
 	mux.HandleFunc("/search", handleSearch)
 
-	log.Printf("syslog-flow listening on %s", addr)
+	log.Printf("syslog-flow listening on %s", listener)
 	server := &http.Server{
 		Addr:              listener,
 		Handler:           mux,
