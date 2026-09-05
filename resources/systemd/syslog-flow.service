@@ -16,6 +16,8 @@ Environment=TZ=UTC
 Environment=SYSLOG_FLOW_LOG_DIR=/var/log/syslog-flow
 Environment=SYSLOG_FLOW_CONFIG_DIR=/var/lib/syslog-flow
 Environment=SYSLOG_FLOW_RESOURCES_DIR=/usr/local/share/syslog-flow
+Environment=SYSLOG_FLOW_ADDR=127.0.0.1
+Environment=SYSLOG_FLOW_PORT=2200
 UMask=0002
 NoNewPrivileges=true
 ProtectSystem=strict
