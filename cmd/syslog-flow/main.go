@@ -23,7 +23,7 @@ const (
 	defaultConfigDir    = "/etc/syslog-flow"
 	defaultResourcesDir = "/usr/local/share/syslog-flow"
 	defaultPort         = "2200"
-	defaultAddr         = ""
+	defaultAddr         = "127.0.0.1"
 	dayChunkSize        = 500
 	maxSearchResults    = 5000
 )
